@@ -299,18 +299,17 @@ text-align: center;
 cursor: pointer;
 transition: border-color 0.2s, background 0.2s;
 position: relative;
+-webkit-tap-highlight-color: transparent;
 }
 .upload-drop:hover, .upload-drop.dragover {
 border-color: var(–gold-dim);
 background: rgba(201,168,76,0.03);
 }
-.upload-drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
 .upload-icon { font-size: 1.5rem; margin-bottom: 0.4rem; color: var(–gold-dim); }
 .upload-text { font-size: 0.62rem; color: var(–text-dim); letter-spacing: 0.05em; line-height: 1.5; }
 .upload-text strong { color: var(–text); font-weight: 500; }
 
-.manual-inputs { margin-top: 0.8rem; display: none; flex-direction: column; gap: 0.5rem; }
-.manual-inputs.visible { display: flex; }
+/* manual-inputs block no longer needed — fields always visible */
 .input-field {
 background: var(–surface3);
 border: 1px solid var(–border);
@@ -677,26 +676,27 @@ select.input-field { font-size: 0.8rem; }
         <button class="member-btn" data-member="Liam" onclick="selectMember('Liam')">Liam</button>
         <button class="member-btn" data-member="Alexis" onclick="selectMember('Alexis')">Alexis</button>
       </div>
-      <div class="upload-drop" id="drop-zone" onclick="document.getElementById('photo-input').click()">
-        <input type="file" id="photo-input" accept="image/*" multiple onchange="handleFiles(this.files)" style="display:none">
-        <div class="upload-icon">📷</div>
-        <div class="upload-text">
-          <strong>Tap to add photos</strong><br>
-          GPS &amp; date read automatically<br>
-          from photo metadata
-        </div>
-      </div>
-      <div class="manual-inputs" id="manual-inputs">
-        <select class="input-field" id="manual-country">
-          <option value="">— Select Country —</option>
-        </select>
-        <input class="input-field" type="date" id="manual-date" placeholder="Date visited">
-        <input class="input-field" type="text" id="manual-note" placeholder="Add a note (optional)">
-      </div>
-      <button class="add-btn" id="add-btn" onclick="addManualEntry()">Add to Map</button>
-    </div>
+      <!-- Country + Date always visible -->
+      <select class="input-field" id="manual-country" style="margin-bottom:0.5rem">
+        <option value="">— Select Country —</option>
+      </select>
+      <input class="input-field" type="date" id="manual-date" style="margin-bottom:0.5rem">
+      <input class="input-field" type="text" id="manual-note" placeholder="Note (optional)" style="margin-bottom:0.8rem">
 
 ```
+  <!-- Photo attach — optional -->
+  <div class="upload-drop" id="drop-zone" onclick="document.getElementById('photo-input').click()">
+    <input type="file" id="photo-input" accept="image/*" multiple onchange="handleFiles(this.files)" style="display:none">
+    <div class="upload-icon" id="upload-icon">📷</div>
+    <div class="upload-text" id="upload-text">
+      <strong>Attach a photo (optional)</strong><br>
+      GPS &amp; date auto-filled if available
+    </div>
+  </div>
+
+  <button class="add-btn" id="add-btn" onclick="addManualEntry()">＋ Add to Map</button>
+</div>
+
 <!-- Tabs -->
 <div class="tabs">
   <button class="tab-btn active" onclick="switchTab('countries')">Countries</button>
@@ -777,7 +777,6 @@ const COUNTRY_NAME_MAP = {
 let entries = []; // {id, member, country, countryCode, date, note, imageDataUrl}
 let selectedMember = 'Holly';
 let activeMembers = new Set(['Holly','Andy','Liam','Alexis']);
-let pendingFiles = [];
 let currentZoom = null;
 let svg, projection, pathGen, zoomBehavior, worldData;
 let countryCodeMap = {}; // numeric id -> alpha code from topojson
@@ -883,71 +882,76 @@ async function reverseGeocode(lat, lon) {
 // ===================== FILE HANDLING =====================
 async function handleFiles(files) {
   if (!files.length) return;
-  pendingFiles = Array.from(files);
-  let added = 0;
+  const file = files[0]; // handle one at a time
 
-  for (const file of pendingFiles) {
-    showToast(`Reading photo metadata...`);
-    const imageDataUrl = await fileToDataUrl(file);
-    const exif = await readEXIF(file);
+  // Show photo preview in the drop zone
+  const imageDataUrl = await fileToDataUrl(file);
+  document.getElementById('upload-icon').textContent = '✓';
+  document.getElementById('upload-text').innerHTML =
+    `<strong>${file.name}</strong><br><span style="color:var(--gold-dim)">Reading metadata...</span>`;
+  window._pendingImage = { imageDataUrl };
 
-    let country = null;
-    const date = exif.date || null;
+  // Try to read EXIF
+  const exif = await readEXIF(file);
 
-    if (exif.lat && exif.lon) {
-      showToast('Looking up country from GPS...');
-      country = await reverseGeocode(exif.lat, exif.lon);
-    }
+  let statusMsg = '';
 
-    if (country) {
-      // Full auto — country and optionally date found
-      await addEntry({ member: selectedMember, country, date, imageDataUrl, note: '' });
-      added++;
-    } else {
-      // Need manual input — pre-fill date if we got it
-      document.getElementById('manual-inputs').classList.add('visible');
-      if (date) document.getElementById('manual-date').value = date;
-      window._pendingImage = { imageDataUrl, exif };
-
-      const msg = exif.lat
-        ? 'Could not resolve country — please select manually'
-        : date
-          ? `Date found (${date}) — please select the country`
-          : 'No GPS or date found — please fill in details';
-      showToast(msg);
-      // Stop processing remaining files until manual is resolved
-      break;
-    }
+  // Auto-fill date if found
+  if (exif.date) {
+    document.getElementById('manual-date').value = exif.date;
+    statusMsg += 'Date ✓ ';
   }
 
-  pendingFiles = [];
+  // Auto-fill country from GPS if found
+  if (exif.lat && exif.lon) {
+    document.getElementById('upload-text').innerHTML =
+      `<strong>${file.name}</strong><br><span style="color:var(--gold-dim)">Looking up location...</span>`;
+    const country = await reverseGeocode(exif.lat, exif.lon);
+    if (country) {
+      // Set the select to matching country
+      const sel = document.getElementById('manual-country');
+      for (const opt of sel.options) {
+        if (opt.value === country) { sel.value = country; break; }
+      }
+      statusMsg += 'Location ✓';
+    } else {
+      statusMsg += 'Location not found — select manually';
+    }
+  } else {
+    statusMsg += exif.date ? 'No GPS — select country manually' : 'No metadata — fill in details';
+  }
+
+  document.getElementById('upload-text').innerHTML =
+    `<strong>${file.name}</strong><br><span style="color:var(--gold-dim)">${statusMsg}</span>`;
+
+  showToast(statusMsg || 'Photo attached — fill in details and tap Add');
   document.getElementById('photo-input').value = '';
-  if (added > 0) showToast(`✓ Added ${added} photo${added > 1 ? 's' : ''} to your map`);
 }
 
 async function addManualEntry() {
   const country = document.getElementById('manual-country').value;
-  const date = document.getElementById('manual-date').value;
-  const note = document.getElementById('manual-note').value;
-  const pending = window._pendingImage;
+  const date = document.getElementById('manual-date').value || null;
+  const note = document.getElementById('manual-note').value.trim();
+  const imageDataUrl = window._pendingImage ? window._pendingImage.imageDataUrl : null;
 
-  if (!country) { showToast('Please select a country'); return; }
+  if (!country) {
+    showToast('Please select a country first');
+    document.getElementById('manual-country').focus();
+    return;
+  }
 
-  await addEntry({
-    member: selectedMember,
-    country,
-    date: date || null,
-    imageDataUrl: pending ? pending.imageDataUrl : null,
-    note
-  });
+  await addEntry({ member: selectedMember, country, date, imageDataUrl, note });
 
-  document.getElementById('manual-inputs').classList.remove('visible');
+  // Reset form
   document.getElementById('manual-country').value = '';
   document.getElementById('manual-date').value = '';
   document.getElementById('manual-note').value = '';
-  document.getElementById('photo-input').value = '';
+  document.getElementById('upload-icon').textContent = '📷';
+  document.getElementById('upload-text').innerHTML =
+    `<strong>Attach a photo (optional)</strong><br>GPS &amp; date auto-filled if available`;
   window._pendingImage = null;
-  showToast('Added to your map!');
+
+  showToast(`✓ ${country} added to your map!`);
 }
 
 async function addEntry({ member, country, date, imageDataUrl, note }) {
