@@ -1,0 +1,1350 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kay Family — World Travels</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+<style>
+  :root {
+    --gold: #C9A84C;
+    --gold-light: #E8C97A;
+    --gold-dim: #7a6330;
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --surface2: #1a1a1a;
+    --surface3: #242424;
+    --text: #e8e0d0;
+    --text-dim: #8a8070;
+    --border: #2a2a2a;
+    --holly: #C9A84C;
+    --andy: #7EB8C9;
+    --liam: #C97B7E;
+    --alexis: #9BC97E;
+  }
+
+- { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+font-family: ‘Montserrat’, sans-serif;
+background: var(–bg);
+color: var(–text);
+min-height: 100vh;
+overflow-x: hidden;
+}
+
+/* Grain overlay */
+body::before {
+content: ‘’;
+position: fixed;
+inset: 0;
+background-image: url(“data:image/svg+xml,%3Csvg viewBox=‘0 0 256 256’ xmlns=‘http://www.w3.org/2000/svg’%3E%3Cfilter id=‘noise’%3E%3CfeTurbulence type=‘fractalNoise’ baseFrequency=‘0.9’ numOctaves=‘4’ stitchTiles=‘stitch’/%3E%3C/filter%3E%3Crect width=‘100%25’ height=‘100%25’ filter=‘url(%23noise)’ opacity=‘0.04’/%3E%3C/svg%3E”);
+pointer-events: none;
+z-index: 1000;
+opacity: 0.4;
+}
+
+/* Header */
+header {
+padding: 2rem 3rem 1.5rem;
+border-bottom: 1px solid var(–border);
+display: flex;
+align-items: center;
+justify-content: space-between;
+position: relative;
+}
+header::after {
+content: ‘’;
+position: absolute;
+bottom: -1px;
+left: 3rem;
+width: 8rem;
+height: 1px;
+background: var(–gold);
+}
+
+.logo {
+display: flex;
+align-items: baseline;
+gap: 1rem;
+}
+.logo-k {
+font-family: ‘Cormorant Garamond’, serif;
+font-size: 3.5rem;
+font-weight: 300;
+color: var(–gold);
+line-height: 1;
+letter-spacing: -0.02em;
+}
+.logo-text {
+display: flex;
+flex-direction: column;
+}
+.logo-title {
+font-family: ‘Cormorant Garamond’, serif;
+font-size: 1.4rem;
+font-weight: 300;
+color: var(–text);
+letter-spacing: 0.15em;
+text-transform: uppercase;
+}
+.logo-sub {
+font-size: 0.6rem;
+font-weight: 300;
+letter-spacing: 0.3em;
+text-transform: uppercase;
+color: var(–gold-dim);
+}
+
+.header-stats {
+display: flex;
+gap: 3rem;
+text-align: right;
+}
+.stat-item { display: flex; flex-direction: column; align-items: flex-end; }
+.stat-num {
+font-family: ‘Cormorant Garamond’, serif;
+font-size: 2rem;
+font-weight: 300;
+color: var(–gold);
+line-height: 1;
+}
+.stat-label {
+font-size: 0.55rem;
+letter-spacing: 0.25em;
+text-transform: uppercase;
+color: var(–text-dim);
+margin-top: 0.2rem;
+}
+
+/* Layout */
+.main-layout {
+display: grid;
+grid-template-columns: 1fr 320px;
+grid-template-rows: auto auto;
+height: calc(100vh - 110px);
+}
+
+/* Map */
+#map-container {
+grid-row: 1 / 3;
+position: relative;
+background: var(–surface);
+overflow: hidden;
+border-right: 1px solid var(–border);
+}
+
+#map-svg {
+width: 100%;
+height: 100%;
+}
+
+.country-default { fill: #1e1e1e; stroke: #2e2e2e; stroke-width: 0.5; cursor: default; transition: fill 0.2s; }
+.country-visited { stroke: #000; stroke-width: 0.5; cursor: pointer; transition: fill 0.3s, opacity 0.2s; opacity: 0.9; }
+.country-visited:hover { opacity: 1; filter: brightness(1.3); }
+
+.map-tooltip {
+position: absolute;
+background: rgba(10,10,10,0.95);
+border: 1px solid var(–gold-dim);
+color: var(–text);
+padding: 0.7rem 1rem;
+font-size: 0.7rem;
+letter-spacing: 0.08em;
+pointer-events: none;
+opacity: 0;
+transition: opacity 0.15s;
+z-index: 10;
+min-width: 160px;
+}
+.map-tooltip.visible { opacity: 1; }
+.tooltip-country {
+font-family: ‘Cormorant Garamond’, serif;
+font-size: 1.1rem;
+color: var(–gold);
+margin-bottom: 0.4rem;
+}
+.tooltip-members { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.3rem; }
+.tooltip-dot {
+width: 8px; height: 8px; border-radius: 50%;
+display: inline-block;
+}
+.tooltip-member { display: flex; align-items: center; gap: 0.3rem; font-size: 0.6rem; color: var(–text-dim); }
+
+/* Map controls */
+.map-controls {
+position: absolute;
+bottom: 1.5rem;
+left: 1.5rem;
+display: flex;
+flex-direction: column;
+gap: 0.4rem;
+}
+.map-btn {
+width: 32px; height: 32px;
+background: rgba(17,17,17,0.9);
+border: 1px solid var(–border);
+color: var(–gold);
+font-size: 1rem;
+cursor: pointer;
+display: flex; align-items: center; justify-content: center;
+transition: border-color 0.2s;
+}
+.map-btn:hover { border-color: var(–gold); }
+
+/* Member legend */
+.member-legend {
+position: absolute;
+top: 1.5rem;
+left: 1.5rem;
+display: flex;
+flex-direction: column;
+gap: 0.5rem;
+}
+.legend-item {
+display: flex;
+align-items: center;
+gap: 0.6rem;
+font-size: 0.6rem;
+letter-spacing: 0.15em;
+text-transform: uppercase;
+color: var(–text-dim);
+cursor: pointer;
+transition: color 0.2s;
+}
+.legend-item:hover { color: var(–text); }
+.legend-dot {
+width: 10px; height: 10px; border-radius: 50%;
+flex-shrink: 0;
+}
+.legend-item.inactive { opacity: 0.3; }
+
+/* Sidebar */
+.sidebar {
+display: flex;
+flex-direction: column;
+overflow: hidden;
+}
+
+/* Add Photo */
+.upload-section {
+padding: 1.5rem;
+border-bottom: 1px solid var(–border);
+background: var(–surface2);
+}
+.section-label {
+font-size: 0.55rem;
+letter-spacing: 0.3em;
+text-transform: uppercase;
+color: var(–gold-dim);
+margin-bottom: 1rem;
+}
+
+.member-select {
+display: flex;
+gap: 0.4rem;
+margin-bottom: 0.8rem;
+flex-wrap: wrap;
+}
+.member-btn {
+flex: 1;
+min-width: 60px;
+padding: 0.4rem 0.3rem;
+background: transparent;
+border: 1px solid var(–border);
+color: var(–text-dim);
+font-family: ‘Montserrat’, sans-serif;
+font-size: 0.6rem;
+font-weight: 300;
+letter-spacing: 0.1em;
+text-transform: uppercase;
+cursor: pointer;
+transition: all 0.2s;
+position: relative;
+}
+.member-btn::before {
+content: ‘’;
+position: absolute;
+bottom: 0; left: 0;
+width: 100%; height: 2px;
+}
+.member-btn[data-member=“Holly”]::before { background: var(–holly); }
+.member-btn[data-member=“Andy”]::before { background: var(–andy); }
+.member-btn[data-member=“Liam”]::before { background: var(–liam); }
+.member-btn[data-member=“Alexis”]::before { background: var(–alexis); }
+.member-btn.active { color: var(–text); border-color: currentColor; background: rgba(255,255,255,0.03); }
+.member-btn[data-member=“Holly”].active { color: var(–holly); border-color: var(–holly); }
+.member-btn[data-member=“Andy”].active { color: var(–andy); border-color: var(–andy); }
+.member-btn[data-member=“Liam”].active { color: var(–liam); border-color: var(–liam); }
+.member-btn[data-member=“Alexis”].active { color: var(–alexis); border-color: var(–alexis); }
+
+.upload-drop {
+border: 1px dashed var(–border);
+padding: 1.2rem;
+text-align: center;
+cursor: pointer;
+transition: border-color 0.2s, background 0.2s;
+position: relative;
+}
+.upload-drop:hover, .upload-drop.dragover {
+border-color: var(–gold-dim);
+background: rgba(201,168,76,0.03);
+}
+.upload-drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+.upload-icon { font-size: 1.5rem; margin-bottom: 0.4rem; color: var(–gold-dim); }
+.upload-text { font-size: 0.62rem; color: var(–text-dim); letter-spacing: 0.05em; line-height: 1.5; }
+.upload-text strong { color: var(–text); font-weight: 500; }
+
+.manual-inputs { margin-top: 0.8rem; display: none; flex-direction: column; gap: 0.5rem; }
+.manual-inputs.visible { display: flex; }
+.input-field {
+background: var(–surface3);
+border: 1px solid var(–border);
+color: var(–text);
+padding: 0.5rem 0.7rem;
+font-family: ‘Montserrat’, sans-serif;
+font-size: 0.65rem;
+font-weight: 300;
+width: 100%;
+outline: none;
+transition: border-color 0.2s;
+}
+.input-field:focus { border-color: var(–gold-dim); }
+.input-field::placeholder { color: var(–text-dim); }
+
+.add-btn {
+width: 100%;
+padding: 0.6rem;
+background: transparent;
+border: 1px solid var(–gold-dim);
+color: var(–gold);
+font-family: ‘Montserrat’, sans-serif;
+font-size: 0.6rem;
+font-weight: 400;
+letter-spacing: 0.2em;
+text-transform: uppercase;
+cursor: pointer;
+transition: all 0.2s;
+margin-top: 0.5rem;
+}
+.add-btn:hover { background: rgba(201,168,76,0.08); border-color: var(–gold); }
+
+/* Tabs */
+.tabs {
+display: flex;
+border-bottom: 1px solid var(–border);
+}
+.tab-btn {
+flex: 1;
+padding: 0.8rem 0.5rem;
+background: transparent;
+border: none;
+color: var(–text-dim);
+font-family: ‘Montserrat’, sans-serif;
+font-size: 0.55rem;
+font-weight: 400;
+letter-spacing: 0.2em;
+text-transform: uppercase;
+cursor: pointer;
+transition: color 0.2s;
+position: relative;
+}
+.tab-btn::after {
+content: ‘’;
+position: absolute;
+bottom: 0; left: 20%; right: 20%;
+height: 1px;
+background: var(–gold);
+transform: scaleX(0);
+transition: transform 0.2s;
+}
+.tab-btn.active { color: var(–gold); }
+.tab-btn.active::after { transform: scaleX(1); }
+
+/* Panels */
+.panel { display: none; flex: 1; overflow-y: auto; padding: 1rem 1.5rem; }
+.panel.active { display: block; }
+.panel::-webkit-scrollbar { width: 3px; }
+.panel::-webkit-scrollbar-track { background: transparent; }
+.panel::-webkit-scrollbar-thumb { background: var(–border); }
+
+/* Countries list */
+.country-entry {
+padding: 0.7rem 0;
+border-bottom: 1px solid var(–border);
+cursor: pointer;
+transition: background 0.15s;
+padding-left: 0.5rem;
+margin-left: -0.5rem;
+padding-right: 0.5rem;
+margin-right: -0.5rem;
+}
+.country-entry:hover { background: rgba(255,255,255,0.02); }
+.country-row {
+display: flex;
+align-items: center;
+justify-content: space-between;
+margin-bottom: 0.3rem;
+}
+.country-name {
+font-family: ‘Cormorant Garamond’, serif;
+font-size: 1rem;
+font-weight: 400;
+color: var(–text);
+}
+.country-photos { font-size: 0.55rem; color: var(–text-dim); letter-spacing: 0.1em; }
+.country-members { display: flex; gap: 4px; }
+.member-pip { width: 6px; height: 6px; border-radius: 50%; }
+
+/* Timeline */
+.year-block { margin-bottom: 1.5rem; }
+.year-label {
+font-family: ‘Cormorant Garamond’, serif;
+font-size: 1.8rem;
+font-weight: 300;
+color: var(–gold);
+border-bottom: 1px solid var(–border);
+padding-bottom: 0.3rem;
+margin-bottom: 0.8rem;
+position: relative;
+}
+.year-label::before {
+content: ‘’;
+position: absolute;
+bottom: -1px; left: 0;
+width: 2rem;
+height: 1px;
+background: var(–gold);
+}
+
+.timeline-entry {
+display: flex;
+gap: 0.8rem;
+margin-bottom: 0.8rem;
+align-items: flex-start;
+}
+.timeline-thumb {
+width: 52px; height: 52px;
+object-fit: cover;
+flex-shrink: 0;
+border: 1px solid var(–border);
+}
+.timeline-thumb-placeholder {
+width: 52px; height: 52px;
+background: var(–surface3);
+border: 1px solid var(–border);
+flex-shrink: 0;
+display: flex; align-items: center; justify-content: center;
+font-size: 1.3rem;
+}
+.timeline-info { flex: 1; min-width: 0; }
+.timeline-country {
+font-family: ‘Cormorant Garamond’, serif;
+font-size: 0.95rem;
+color: var(–text);
+}
+.timeline-date { font-size: 0.55rem; color: var(–text-dim); letter-spacing: 0.1em; margin: 0.15rem 0; }
+.timeline-member {
+font-size: 0.55rem;
+letter-spacing: 0.12em;
+text-transform: uppercase;
+}
+.timeline-del {
+background: transparent;
+border: none;
+color: var(–border);
+cursor: pointer;
+font-size: 0.7rem;
+padding: 0.2rem;
+transition: color 0.2s;
+flex-shrink: 0;
+}
+.timeline-del:hover { color: #c97b7e; }
+
+/* Photo lightbox */
+.lightbox {
+display: none;
+position: fixed;
+inset: 0;
+background: rgba(0,0,0,0.92);
+z-index: 500;
+align-items: center;
+justify-content: center;
+}
+.lightbox.open { display: flex; }
+.lightbox-inner {
+position: relative;
+max-width: 90vw;
+max-height: 90vh;
+}
+.lightbox img { max-width: 80vw; max-height: 80vh; object-fit: contain; border: 1px solid var(–border); }
+.lightbox-close {
+position: absolute;
+top: -2rem; right: 0;
+background: transparent;
+border: none;
+color: var(–gold);
+font-size: 1.2rem;
+cursor: pointer;
+letter-spacing: 0.1em;
+}
+.lightbox-caption {
+text-align: center;
+margin-top: 1rem;
+font-family: ‘Cormorant Garamond’, serif;
+font-size: 1rem;
+color: var(–text-dim);
+}
+
+/* Photo modal for country */
+.photo-grid {
+display: grid;
+grid-template-columns: repeat(3, 1fr);
+gap: 0.3rem;
+margin-top: 0.5rem;
+}
+.photo-thumb {
+aspect-ratio: 1;
+object-fit: cover;
+cursor: pointer;
+opacity: 0.85;
+transition: opacity 0.2s;
+border: 1px solid var(–border);
+width: 100%;
+}
+.photo-thumb:hover { opacity: 1; }
+
+.empty-state {
+text-align: center;
+padding: 2rem 1rem;
+color: var(–text-dim);
+font-size: 0.65rem;
+letter-spacing: 0.1em;
+line-height: 2;
+}
+.empty-icon { font-size: 2rem; margin-bottom: 0.5rem; opacity: 0.4; }
+
+/* Toast */
+.toast {
+position: fixed;
+bottom: 2rem;
+left: 50%;
+transform: translateX(-50%) translateY(4rem);
+background: var(–surface2);
+border: 1px solid var(–gold-dim);
+color: var(–gold);
+padding: 0.6rem 1.5rem;
+font-size: 0.65rem;
+letter-spacing: 0.15em;
+text-transform: uppercase;
+transition: transform 0.3s;
+z-index: 200;
+pointer-events: none;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+
+@media (max-width: 768px) {
+.main-layout { grid-template-columns: 1fr; grid-template-rows: 50vh auto; }
+#map-container { grid-row: 1; border-right: none; border-bottom: 1px solid var(–border); }
+.sidebar { grid-row: 2; }
+header { padding: 1rem 1.5rem; }
+.header-stats { gap: 1.5rem; }
+}
+</style>
+
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-k">K</div>
+    <div class="logo-text">
+      <div class="logo-title">Kay Family</div>
+      <div class="logo-sub">World Travels</div>
+    </div>
+  </div>
+  <div class="header-stats">
+    <div class="stat-item">
+      <div class="stat-num" id="stat-countries">0</div>
+      <div class="stat-label">Countries</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-num" id="stat-photos">0</div>
+      <div class="stat-label">Photos</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-num" id="stat-years">0</div>
+      <div class="stat-label">Years</div>
+    </div>
+  </div>
+</header>
+
+<div class="main-layout">
+  <!-- Map -->
+  <div id="map-container">
+    <svg id="map-svg"></svg>
+    <div class="member-legend">
+      <div class="legend-item" data-member="Holly" onclick="toggleMember('Holly')">
+        <div class="legend-dot" style="background:var(--holly)"></div> Holly
+      </div>
+      <div class="legend-item" data-member="Andy" onclick="toggleMember('Andy')">
+        <div class="legend-dot" style="background:var(--andy)"></div> Andy
+      </div>
+      <div class="legend-item" data-member="Liam" onclick="toggleMember('Liam')">
+        <div class="legend-dot" style="background:var(--liam)"></div> Liam
+      </div>
+      <div class="legend-item" data-member="Alexis" onclick="toggleMember('Alexis')">
+        <div class="legend-dot" style="background:var(--alexis)"></div> Alexis
+      </div>
+    </div>
+    <div class="map-controls">
+      <button class="map-btn" onclick="zoomIn()">+</button>
+      <button class="map-btn" onclick="zoomOut()">−</button>
+      <button class="map-btn" onclick="resetZoom()" title="Reset">⌂</button>
+    </div>
+    <div class="map-tooltip" id="map-tooltip">
+      <div class="tooltip-country" id="tt-country"></div>
+      <div class="tooltip-members" id="tt-members"></div>
+      <div id="tt-photos" style="font-size:0.6rem;color:var(--text-dim)"></div>
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+
+  <div class="sidebar">
+    <!-- Upload -->
+    <div class="upload-section">
+      <div class="section-label">Add a Memory</div>
+      <div class="member-select">
+        <button class="member-btn active" data-member="Holly" onclick="selectMember('Holly')">Holly</button>
+        <button class="member-btn" data-member="Andy" onclick="selectMember('Andy')">Andy</button>
+        <button class="member-btn" data-member="Liam" onclick="selectMember('Liam')">Liam</button>
+        <button class="member-btn" data-member="Alexis" onclick="selectMember('Alexis')">Alexis</button>
+      </div>
+      <div class="upload-drop" id="drop-zone">
+        <input type="file" id="photo-input" accept="image/*" multiple onchange="handleFiles(this.files)">
+        <div class="upload-icon">📷</div>
+        <div class="upload-text">
+          <strong>Tap to add photos</strong><br>
+          GPS & date read automatically<br>
+          from photo metadata
+        </div>
+      </div>
+      <div class="manual-inputs" id="manual-inputs">
+        <select class="input-field" id="manual-country">
+          <option value="">— Select Country —</option>
+        </select>
+        <input class="input-field" type="date" id="manual-date" placeholder="Date visited">
+        <input class="input-field" type="text" id="manual-note" placeholder="Add a note (optional)">
+      </div>
+      <button class="add-btn" id="add-btn" onclick="addManualEntry()">Add to Map</button>
+    </div>
+
+```
+<!-- Tabs -->
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('countries')">Countries</button>
+  <button class="tab-btn" onclick="switchTab('timeline')">Timeline</button>
+</div>
+
+<div class="panel active" id="panel-countries"></div>
+<div class="panel" id="panel-timeline"></div>
+```
+
+  </div>
+</div>
+
+<!-- Lightbox -->
+
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <div class="lightbox-inner" onclick="event.stopPropagation()">
+    <button class="lightbox-close" onclick="closeLightbox()">✕ Close</button>
+    <img id="lightbox-img" src="" alt="">
+    <div class="lightbox-caption" id="lightbox-caption"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ===================== CONFIG =====================
+const MEMBERS = {
+  Holly:  '#C9A84C',
+  Andy:   '#7EB8C9',
+  Liam:   '#C97B7E',
+  Alexis: '#9BC97E'
+};
+
+// Country name → ISO alpha-2 mapping (common travel destinations)
+const COUNTRY_NAME_MAP = {
+  "United States of America": "US", "United States": "US", "USA": "US",
+  "United Kingdom": "GB", "UK": "GB", "England": "GB", "Britain": "GB",
+  "France": "FR", "Germany": "DE", "Italy": "IT", "Spain": "ES",
+  "Japan": "JP", "China": "CN", "Australia": "AU", "Canada": "CA",
+  "Mexico": "MX", "Brazil": "BR", "Argentina": "AR", "India": "IN",
+  "Thailand": "TH", "Vietnam": "VN", "Indonesia": "ID", "Philippines": "PH",
+  "South Korea": "KR", "Korea": "KR", "Singapore": "SG", "Malaysia": "MY",
+  "New Zealand": "NZ", "South Africa": "ZA", "Egypt": "EG", "Morocco": "MA",
+  "Kenya": "KE", "Greece": "GR", "Portugal": "PT", "Netherlands": "NL",
+  "Belgium": "BE", "Switzerland": "CH", "Austria": "AT", "Sweden": "SE",
+  "Norway": "NO", "Denmark": "DK", "Finland": "FI", "Poland": "PL",
+  "Czech Republic": "CZ", "Hungary": "HU", "Croatia": "HR", "Romania": "RO",
+  "Turkey": "TR", "Israel": "IL", "United Arab Emirates": "AE", "UAE": "AE",
+  "Saudi Arabia": "SA", "Jordan": "JO", "Iceland": "IS", "Ireland": "IE",
+  "Scotland": "GB", "Wales": "GB", "Peru": "PE", "Colombia": "CO",
+  "Chile": "CL", "Ecuador": "EC", "Bolivia": "BO", "Uruguay": "UY",
+  "Cuba": "CU", "Dominican Republic": "DO", "Jamaica": "JM", "Bahamas": "BS",
+  "Maldives": "MV", "Sri Lanka": "LK", "Nepal": "NP", "Bhutan": "BT",
+  "Cambodia": "KH", "Myanmar": "MM", "Laos": "LA", "Taiwan": "TW",
+  "Hong Kong": "HK", "Macau": "MO", "Russia": "RU", "Ukraine": "UA",
+  "Slovakia": "SK", "Slovenia": "SI", "Serbia": "RS", "Bulgaria": "BG",
+  "Albania": "AL", "Kosovo": "XK", "North Macedonia": "MK", "Montenegro": "ME",
+  "Luxembourg": "LU", "Malta": "MT", "Cyprus": "CY", "Estonia": "EE",
+  "Latvia": "LV", "Lithuania": "LT", "Belarus": "BY", "Moldova": "MD",
+  "Georgia": "GE", "Armenia": "AM", "Azerbaijan": "AZ", "Kazakhstan": "KZ",
+  "Uzbekistan": "UZ", "Pakistan": "PK", "Bangladesh": "BD", "Afghanistan": "AF",
+  "Iran": "IR", "Iraq": "IQ", "Kuwait": "KW", "Qatar": "QA", "Bahrain": "BH",
+  "Oman": "OM", "Yemen": "YE", "Libya": "LY", "Tunisia": "TN", "Algeria": "DZ",
+  "Sudan": "SD", "Ethiopia": "ET", "Tanzania": "TZ", "Uganda": "UG",
+  "Rwanda": "RW", "Ghana": "GH", "Nigeria": "NG", "Senegal": "SN",
+  "Ivory Coast": "CI", "Cameroon": "CM", "Mozambique": "MZ", "Zimbabwe": "ZW",
+  "Zambia": "ZM", "Botswana": "BW", "Namibia": "NA", "Madagascar": "MG",
+  "Cuba": "CU", "Haiti": "HT", "Guatemala": "GT", "Honduras": "HN",
+  "El Salvador": "SV", "Nicaragua": "NI", "Costa Rica": "CR", "Panama": "PA",
+  "Venezuela": "VE", "Paraguay": "PY", "Guyana": "GY", "Suriname": "SR",
+  "Trinidad and Tobago": "TT", "Barbados": "BB", "Fiji": "FJ",
+  "Papua New Guinea": "PG", "Solomon Islands": "SB", "Vanuatu": "VU",
+  "Samoa": "WS", "Tonga": "TO"
+};
+
+// ===================== STATE =====================
+let entries = []; // {id, member, country, countryCode, date, note, imageDataUrl}
+let selectedMember = 'Holly';
+let activeMembers = new Set(['Holly','Andy','Liam','Alexis']);
+let pendingFiles = [];
+let currentZoom = null;
+let svg, projection, pathGen, zoomBehavior, worldData;
+let countryCodeMap = {}; // numeric id -> alpha code from topojson
+
+// ===================== INDEXEDDB =====================
+let db;
+const DB_NAME = 'KayTravelMap', DB_VERSION = 1, STORE = 'entries';
+
+function openDB() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = e => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains(STORE)) {
+        d.createObjectStore(STORE, { keyPath: 'id' });
+      }
+    };
+    req.onsuccess = e => { db = e.target.result; res(db); };
+    req.onerror = () => rej(req.error);
+  });
+}
+
+async function saveEntry(entry) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).put(entry);
+    tx.oncomplete = res;
+    tx.onerror = () => rej(tx.error);
+  });
+}
+
+async function deleteEntry(id) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).delete(id);
+    tx.oncomplete = res;
+    tx.onerror = () => rej(tx.error);
+  });
+}
+
+async function loadAllEntries() {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(STORE, 'readonly');
+    const req = tx.objectStore(STORE).getAll();
+    req.onsuccess = () => res(req.result);
+    req.onerror = () => rej(req.error);
+  });
+}
+
+// ===================== EXIF / GPS =====================
+function readEXIF(file) {
+  return new Promise(res => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const buf = e.target.result;
+      const view = new DataView(buf);
+      try {
+        const exif = parseEXIF(view);
+        res(exif);
+      } catch { res({}); }
+    };
+    reader.onerror = () => res({});
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function parseEXIF(view) {
+  if (view.getUint16(0) !== 0xFFD8) return {};
+  let offset = 2, result = {};
+  while (offset < view.byteLength - 2) {
+    const marker = view.getUint16(offset);
+    offset += 2;
+    if (marker === 0xFFE1) {
+      const len = view.getUint16(offset);
+      const exifData = parseIFD(view, offset + 2, len - 2);
+      Object.assign(result, exifData);
+      break;
+    }
+    if ((marker & 0xFF00) !== 0xFF00) break;
+    offset += view.getUint16(offset);
+  }
+  return result;
+}
+
+function parseIFD(view, start, len) {
+  const result = {};
+  try {
+    // Check Exif header
+    const header = String.fromCharCode(
+      view.getUint8(start), view.getUint8(start+1),
+      view.getUint8(start+2), view.getUint8(start+3)
+    );
+    if (!header.startsWith('Exif')) return result;
+    const tiffStart = start + 6;
+    const endian = view.getUint16(tiffStart) === 0x4949 ? true : false; // little endian?
+    const get16 = o => view.getUint16(tiffStart + o, endian);
+    const get32 = o => view.getUint32(tiffStart + o, endian);
+    const ifdOffset = get32(4);
+    const numEntries = get16(ifdOffset);
+    for (let i = 0; i < numEntries; i++) {
+      const entryOffset = ifdOffset + 2 + i * 12;
+      const tag = get16(entryOffset);
+      const type = get16(entryOffset + 2);
+      const count = get32(entryOffset + 4);
+      const valueOffset = entryOffset + 8;
+
+      // DateTimeOriginal = 0x9003
+      if (tag === 0x9003) {
+        let str = '';
+        for (let j = 0; j < count && j < 20; j++)
+          str += String.fromCharCode(view.getUint8(tiffStart + get32(valueOffset) + j));
+        // Format: "YYYY:MM:DD HH:MM:SS"
+        const m = str.match(/(\d{4}):(\d{2}):(\d{2})/);
+        if (m) result.date = `${m[1]}-${m[2]}-${m[3]}`;
+      }
+
+      // GPSInfo IFD pointer = 0x8825
+      if (tag === 0x8825) {
+        const gpsOffset = get32(valueOffset);
+        const gpsEntries = get16(gpsOffset);
+        let latRef, lat, lonRef, lon;
+        for (let g = 0; g < gpsEntries; g++) {
+          const go = gpsOffset + 2 + g * 12;
+          const gtag = get16(go);
+          const gcount = get32(go + 4);
+          const gvo = go + 8;
+          const gDataOffset = tiffStart + get32(gvo);
+          const getRational = off => {
+            const num = view.getUint32(tiffStart + off, endian);
+            const den = view.getUint32(tiffStart + off + 4, endian);
+            return den === 0 ? 0 : num / den;
+          };
+          if (gtag === 1) latRef = String.fromCharCode(view.getUint8(gDataOffset));
+          if (gtag === 2) {
+            const d = getRational(get32(gvo));
+            const m2 = getRational(get32(gvo) + 8);
+            const s = getRational(get32(gvo) + 16);
+            lat = d + m2/60 + s/3600;
+          }
+          if (gtag === 3) lonRef = String.fromCharCode(view.getUint8(gDataOffset));
+          if (gtag === 4) {
+            const d = getRational(get32(gvo));
+            const m2 = getRational(get32(gvo) + 8);
+            const s = getRational(get32(gvo) + 16);
+            lon = d + m2/60 + s/3600;
+          }
+        }
+        if (lat !== undefined && lon !== undefined) {
+          if (latRef === 'S') lat = -lat;
+          if (lonRef === 'W') lon = -lon;
+          result.lat = lat;
+          result.lon = lon;
+        }
+      }
+    }
+    // Check for SubIFD (Exif IFD) for DateTimeOriginal
+    for (let i = 0; i < numEntries; i++) {
+      const entryOffset = ifdOffset + 2 + i * 12;
+      const tag = get16(entryOffset);
+      if (tag === 0x8769) {
+        const subOffset = get32(entryOffset + 8);
+        const subEntries = get16(subOffset);
+        for (let j = 0; j < subEntries; j++) {
+          const seo = subOffset + 2 + j * 12;
+          const stag = get16(seo);
+          const scount = get32(seo + 4);
+          if (stag === 0x9003 && !result.date) {
+            let str = '';
+            const doff = tiffStart + get32(seo + 8);
+            for (let k = 0; k < scount && k < 20; k++)
+              str += String.fromCharCode(view.getUint8(doff + k));
+            const m = str.match(/(\d{4}):(\d{2}):(\d{2})/);
+            if (m) result.date = `${m[1]}-${m[2]}-${m[3]}`;
+          }
+        }
+      }
+    }
+  } catch (err) {}
+  return result;
+}
+
+async function reverseGeocode(lat, lon) {
+  try {
+    const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=3`);
+    const data = await resp.json();
+    return data?.address?.country || null;
+  } catch { return null; }
+}
+
+// ===================== FILE HANDLING =====================
+async function handleFiles(files) {
+  if (!files.length) return;
+  pendingFiles = Array.from(files);
+  showToast(`Reading ${pendingFiles.length} photo${pendingFiles.length > 1 ? 's' : ''}...`);
+
+  for (const file of pendingFiles) {
+    const imageDataUrl = await fileToDataUrl(file);
+    const exif = await readEXIF(file);
+    let country = null, date = exif.date || null;
+
+    if (exif.lat && exif.lon) {
+      showToast('Reading GPS location...');
+      country = await reverseGeocode(exif.lat, exif.lon);
+    }
+
+    if (!country && !date) {
+      // Show manual inputs
+      document.getElementById('manual-inputs').classList.add('visible');
+      showToast('No GPS data found — please select country & date');
+      // Store pending image
+      window._pendingImage = { imageDataUrl, exif };
+      return;
+    }
+
+    await addEntry({ member: selectedMember, country, date, imageDataUrl, note: '' });
+  }
+
+  pendingFiles = [];
+  document.getElementById('photo-input').value = '';
+  showToast('Added to your map!');
+}
+
+async function addManualEntry() {
+  const country = document.getElementById('manual-country').value;
+  const date = document.getElementById('manual-date').value;
+  const note = document.getElementById('manual-note').value;
+  const pending = window._pendingImage;
+
+  if (!country) { showToast('Please select a country'); return; }
+
+  await addEntry({
+    member: selectedMember,
+    country,
+    date: date || null,
+    imageDataUrl: pending ? pending.imageDataUrl : null,
+    note
+  });
+
+  document.getElementById('manual-inputs').classList.remove('visible');
+  document.getElementById('manual-country').value = '';
+  document.getElementById('manual-date').value = '';
+  document.getElementById('manual-note').value = '';
+  document.getElementById('photo-input').value = '';
+  window._pendingImage = null;
+  showToast('Added to your map!');
+}
+
+async function addEntry({ member, country, date, imageDataUrl, note }) {
+  if (!country) return;
+  const entry = {
+    id: Date.now() + Math.random(),
+    member,
+    country,
+    countryCode: COUNTRY_NAME_MAP[country] || null,
+    date,
+    note,
+    imageDataUrl
+  };
+  entries.push(entry);
+  await saveEntry(entry);
+  render();
+}
+
+function fileToDataUrl(file) {
+  return new Promise((res, rej) => {
+    const reader = new FileReader();
+    reader.onload = e => res(e.target.result);
+    reader.onerror = rej;
+    reader.readAsDataURL(file);
+  });
+}
+
+// ===================== MAP =====================
+async function initMap() {
+  const container = document.getElementById('map-container');
+  const w = container.clientWidth, h = container.clientHeight;
+
+  svg = d3.select('#map-svg')
+    .attr('width', w)
+    .attr('height', h);
+
+  projection = d3.geoNaturalEarth1()
+    .scale(w / 6.3)
+    .translate([w / 2, h / 2]);
+
+  pathGen = d3.geoPath().projection(projection);
+
+  zoomBehavior = d3.zoom()
+    .scaleExtent([1, 8])
+    .on('zoom', e => {
+      svg.select('g.world').attr('transform', e.transform);
+      currentZoom = e.transform;
+    });
+
+  svg.call(zoomBehavior);
+
+  const world = await d3.json('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json');
+  worldData = world;
+
+  // Build country code map from world atlas
+  // We'll use name matching against our COUNTRY_NAME_MAP
+  const g = svg.append('g').attr('class', 'world');
+
+  const countries = topojson.feature(world, world.objects.countries);
+
+  g.selectAll('path.country')
+    .data(countries.features)
+    .enter()
+    .append('path')
+    .attr('class', 'country-default')
+    .attr('d', pathGen)
+    .attr('data-id', d => d.id)
+    .on('mouseover', function(event, d) { showMapTooltip(event, d); })
+    .on('mousemove', function(event) {
+      const tt = document.getElementById('map-tooltip');
+      tt.style.left = (event.offsetX + 12) + 'px';
+      tt.style.top = (event.offsetY - 10) + 'px';
+    })
+    .on('mouseout', () => {
+      document.getElementById('map-tooltip').classList.remove('visible');
+    });
+
+  // Borders
+  g.append('path')
+    .datum(topojson.mesh(world, world.objects.countries, (a, b) => a !== b))
+    .attr('fill', 'none')
+    .attr('stroke', '#2a2a2a')
+    .attr('stroke-width', 0.5)
+    .attr('d', pathGen);
+}
+
+function getCountryNameById(id) {
+  // Map numeric IDs to country names using a partial lookup
+  const numericToName = {
+    840: "United States of America", 826: "United Kingdom", 250: "France",
+    276: "Germany", 380: "Italy", 724: "Spain", 392: "Japan", 156: "China",
+    36: "Australia", 124: "Canada", 484: "Mexico", 76: "Brazil", 32: "Argentina",
+    356: "India", 764: "Thailand", 704: "Vietnam", 360: "Indonesia", 608: "Philippines",
+    410: "South Korea", 702: "Singapore", 458: "Malaysia", 554: "New Zealand",
+    710: "South Africa", 818: "Egypt", 504: "Morocco", 404: "Kenya", 300: "Greece",
+    620: "Portugal", 528: "Netherlands", 56: "Belgium", 756: "Switzerland",
+    40: "Austria", 752: "Sweden", 578: "Norway", 208: "Denmark", 246: "Finland",
+    616: "Poland", 203: "Czech Republic", 348: "Hungary", 191: "Croatia",
+    642: "Romania", 792: "Turkey", 376: "Israel", 784: "United Arab Emirates",
+    682: "Saudi Arabia", 400: "Jordan", 352: "Iceland", 372: "Ireland",
+    604: "Peru", 170: "Colombia", 152: "Chile", 218: "Ecuador", 68: "Bolivia",
+    858: "Uruguay", 192: "Cuba", 214: "Dominican Republic", 388: "Jamaica",
+    462: "Maldives", 144: "Sri Lanka", 524: "Nepal", 116: "Cambodia",
+    104: "Myanmar", 418: "Laos", 158: "Taiwan", 344: "Hong Kong", 643: "Russia",
+    804: "Ukraine", 703: "Slovakia", 705: "Slovenia", 688: "Serbia", 100: "Bulgaria",
+    8: "Albania", 442: "Luxembourg", 470: "Malta", 196: "Cyprus", 233: "Estonia",
+    428: "Latvia", 440: "Lithuania", 112: "Belarus", 498: "Moldova", 268: "Georgia",
+    51: "Armenia", 31: "Azerbaijan", 398: "Kazakhstan", 860: "Uzbekistan",
+    586: "Pakistan", 50: "Bangladesh", 364: "Iran", 368: "Iraq", 414: "Kuwait",
+    634: "Qatar", 48: "Bahrain", 512: "Oman", 887: "Yemen", 434: "Libya",
+    788: "Tunisia", 12: "Algeria", 729: "Sudan", 231: "Ethiopia", 834: "Tanzania",
+    800: "Uganda", 646: "Rwanda", 288: "Ghana", 566: "Nigeria", 686: "Senegal",
+    384: "Ivory Coast", 120: "Cameroon", 508: "Mozambique", 716: "Zimbabwe",
+    894: "Zambia", 72: "Botswana", 516: "Namibia", 450: "Madagascar",
+    320: "Guatemala", 340: "Honduras", 222: "El Salvador", 558: "Nicaragua",
+    188: "Costa Rica", 591: "Panama", 862: "Venezuela", 600: "Paraguay",
+    328: "Guyana", 740: "Suriname", 780: "Trinidad and Tobago", 52: "Barbados",
+    242: "Fiji", 598: "Papua New Guinea"
+  };
+  return numericToName[id] || null;
+}
+
+function updateMapColors() {
+  if (!svg) return;
+
+  // Count members per country
+  const countryMembers = {};
+  for (const e of entries) {
+    if (!activeMembers.has(e.member)) continue;
+    if (!e.country) continue;
+    if (!countryMembers[e.country]) countryMembers[e.country] = new Set();
+    countryMembers[e.country].add(e.member);
+  }
+
+  svg.selectAll('path.country-default, path.country-visited')
+    .each(function(d) {
+      const el = d3.select(this);
+      const name = getCountryNameById(d.id);
+      if (name && countryMembers[name]) {
+        const members = Array.from(countryMembers[name]);
+        // Color by first member if one, or gold if multiple
+        let color;
+        if (members.length === 1) {
+          color = MEMBERS[members[0]];
+        } else {
+          color = '#C9A84C'; // gold for shared
+        }
+        el.attr('class', 'country-visited')
+          .attr('fill', color);
+      } else {
+        el.attr('class', 'country-default')
+          .attr('fill', '#1e1e1e');
+      }
+    });
+}
+
+function showMapTooltip(event, d) {
+  const name = getCountryNameById(d.id);
+  if (!name) return;
+
+  const relevant = entries.filter(e => e.country === name && activeMembers.has(e.member));
+  if (!relevant.length) return;
+
+  const memberSet = [...new Set(relevant.map(e => e.member))];
+  const tt = document.getElementById('map-tooltip');
+  document.getElementById('tt-country').textContent = name;
+  document.getElementById('tt-members').innerHTML = memberSet.map(m =>
+    `<span class="tooltip-member"><span class="tooltip-dot" style="background:${MEMBERS[m]}"></span>${m}</span>`
+  ).join('');
+  document.getElementById('tt-photos').textContent = `${relevant.length} photo${relevant.length !== 1 ? 's' : ''}`;
+
+  tt.style.left = (event.offsetX + 12) + 'px';
+  tt.style.top = (event.offsetY - 10) + 'px';
+  tt.classList.add('visible');
+}
+
+function zoomIn() { svg.transition().call(zoomBehavior.scaleBy, 1.5); }
+function zoomOut() { svg.transition().call(zoomBehavior.scaleBy, 0.67); }
+function resetZoom() { svg.transition().call(zoomBehavior.transform, d3.zoomIdentity); }
+
+function toggleMember(m) {
+  if (activeMembers.has(m)) activeMembers.delete(m);
+  else activeMembers.add(m);
+  document.querySelector(`.legend-item[data-member="${m}"]`).classList.toggle('inactive');
+  updateMapColors();
+  renderPanels();
+}
+
+// ===================== RENDER =====================
+function render() {
+  updateStats();
+  updateMapColors();
+  renderPanels();
+}
+
+function updateStats() {
+  const countries = new Set(entries.map(e => e.country).filter(Boolean));
+  const years = new Set(entries.map(e => e.date ? e.date.substring(0,4) : null).filter(Boolean));
+  document.getElementById('stat-countries').textContent = countries.size;
+  document.getElementById('stat-photos').textContent = entries.length;
+  document.getElementById('stat-years').textContent = years.size;
+}
+
+function renderPanels() {
+  renderCountries();
+  renderTimeline();
+}
+
+function renderCountries() {
+  const panel = document.getElementById('panel-countries');
+  const filtered = entries.filter(e => activeMembers.has(e.member));
+
+  if (!filtered.length) {
+    panel.innerHTML = `<div class="empty-state"><div class="empty-icon">🌍</div>Add your first travel photo<br>to start building your map</div>`;
+    return;
+  }
+
+  // Group by country
+  const byCountry = {};
+  for (const e of filtered) {
+    if (!e.country) continue;
+    if (!byCountry[e.country]) byCountry[e.country] = [];
+    byCountry[e.country].push(e);
+  }
+
+  const sorted = Object.entries(byCountry).sort((a,b) => a[0].localeCompare(b[0]));
+
+  panel.innerHTML = sorted.map(([country, cEntries]) => {
+    const members = [...new Set(cEntries.map(e => e.member))];
+    const pips = members.map(m => `<div class="member-pip" style="background:${MEMBERS[m]}"></div>`).join('');
+    return `
+      <div class="country-entry" onclick="showCountryPhotos('${country.replace(/'/g,"\\'")}')">
+        <div class="country-row">
+          <div class="country-name">${country}</div>
+          <div class="country-members">${pips}</div>
+        </div>
+        <div class="country-photos">${cEntries.length} photo${cEntries.length !== 1 ? 's' : ''} · ${members.join(', ')}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderTimeline() {
+  const panel = document.getElementById('panel-timeline');
+  const filtered = entries.filter(e => activeMembers.has(e.member) && e.date);
+  const noDate = entries.filter(e => activeMembers.has(e.member) && !e.date);
+
+  if (!filtered.length && !noDate.length) {
+    panel.innerHTML = `<div class="empty-state"><div class="empty-icon">📅</div>Photos with date info<br>will appear here</div>`;
+    return;
+  }
+
+  // Group by year
+  const byYear = {};
+  for (const e of filtered) {
+    const yr = e.date.substring(0,4);
+    if (!byYear[yr]) byYear[yr] = [];
+    byYear[yr].push(e);
+  }
+  if (noDate.length) byYear['Unknown'] = noDate;
+
+  const sorted = Object.entries(byYear).sort((a,b) => b[0].localeCompare(a[0]));
+
+  panel.innerHTML = sorted.map(([year, yEntries]) => {
+    const entriesHtml = yEntries
+      .sort((a,b) => (b.date||'').localeCompare(a.date||''))
+      .map(e => {
+        const thumb = e.imageDataUrl
+          ? `<img class="timeline-thumb" src="${e.imageDataUrl}" alt="" onclick="openLightbox('${e.id}')">`
+          : `<div class="timeline-thumb-placeholder">📍</div>`;
+        const dateStr = e.date ? new Date(e.date + 'T12:00:00').toLocaleDateString('en-US', {month:'short', day:'numeric'}) : '';
+        return `
+          <div class="timeline-entry">
+            ${thumb}
+            <div class="timeline-info">
+              <div class="timeline-country">${e.country || 'Unknown'}</div>
+              <div class="timeline-date">${dateStr}</div>
+              <div class="timeline-member" style="color:${MEMBERS[e.member]}">${e.member}</div>
+              ${e.note ? `<div style="font-size:0.6rem;color:var(--text-dim);margin-top:0.2rem">${e.note}</div>` : ''}
+            </div>
+            <button class="timeline-del" onclick="removeEntry(${e.id})" title="Remove">✕</button>
+          </div>
+        `;
+      }).join('');
+    return `<div class="year-block"><div class="year-label">${year}</div>${entriesHtml}</div>`;
+  }).join('');
+}
+
+function showCountryPhotos(country) {
+  const cEntries = entries.filter(e => e.country === country && e.imageDataUrl);
+  if (!cEntries.length) { showToast('No photos for ' + country); return; }
+
+  // Show first photo in lightbox
+  openLightboxImg(cEntries[0].imageDataUrl, `${country} · ${cEntries[0].member}`);
+}
+
+function openLightbox(id) {
+  const e = entries.find(x => x.id == id);
+  if (!e || !e.imageDataUrl) return;
+  openLightboxImg(e.imageDataUrl, `${e.country} · ${e.member}${e.date ? ' · ' + e.date : ''}`);
+}
+
+function openLightboxImg(src, caption) {
+  document.getElementById('lightbox-img').src = src;
+  document.getElementById('lightbox-caption').textContent = caption;
+  document.getElementById('lightbox').classList.add('open');
+}
+
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('open');
+}
+
+async function removeEntry(id) {
+  entries = entries.filter(e => e.id !== id);
+  await deleteEntry(id);
+  render();
+  showToast('Removed');
+}
+
+// ===================== UI =====================
+function selectMember(m) {
+  selectedMember = m;
+  document.querySelectorAll('.member-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.member-btn[data-member="${m}"]`).classList.add('active');
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach((b,i) => {
+    b.classList.toggle('active', ['countries','timeline'][i] === tab);
+  });
+  document.getElementById('panel-countries').classList.toggle('active', tab === 'countries');
+  document.getElementById('panel-timeline').classList.toggle('active', tab === 'timeline');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// Populate country dropdown
+function populateCountrySelect() {
+  const sel = document.getElementById('manual-country');
+  const names = Object.keys(COUNTRY_NAME_MAP).sort();
+  names.forEach(n => {
+    const opt = document.createElement('option');
+    opt.value = n;
+    opt.textContent = n;
+    sel.appendChild(opt);
+  });
+}
+
+// Drag and drop
+const dropZone = document.getElementById('drop-zone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  handleFiles(e.dataTransfer.files);
+});
+
+// ===================== INIT =====================
+async function init() {
+  await openDB();
+  entries = await loadAllEntries();
+  populateCountrySelect();
+  await initMap();
+  render();
+}
+
+init();
+</script>
+
+</body>
+</html>
